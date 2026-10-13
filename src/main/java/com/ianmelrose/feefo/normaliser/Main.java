@@ -15,11 +15,6 @@ public final class Main {
     private Main() {
     }
 
-    /**
-     * Entry point.
-     *
-     * @param args job titles to normalise; the brief's examples are used when empty
-     */
     public static void main(String[] args) {
         run(args.length == 0 ? BRIEF_EXAMPLES : List.of(args), System.out);
     }

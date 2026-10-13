@@ -4,51 +4,39 @@ import com.ianmelrose.feefo.normaliser.exception.NoMatchException;
 import com.ianmelrose.feefo.normaliser.scoring.JaccardScorer;
 import com.ianmelrose.feefo.normaliser.scoring.SimilarityScorer;
 import com.ianmelrose.feefo.normaliser.tokenise.SimpleTokeniser;
+import com.ianmelrose.feefo.normaliser.tokenise.Tokeniser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.*;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static com.ianmelrose.feefo.normaliser.Normaliser.DEFAULT_THRESHOLD;
+import static com.ianmelrose.feefo.normaliser.Normaliser.DEFAULT_TITLES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 class NormaliserTest {
+
+    private static final double TOLERANCE = 1e-9;
+    private static final Tokeniser TOKENISER = new SimpleTokeniser();
+    private static final SimilarityScorer SCORER = new JaccardScorer();
 
     private final Normaliser normaliser = new Normaliser();
 
     private static Normaliser withThreshold(double threshold) {
-        return new Normaliser(Normaliser.DEFAULT_TITLES, new SimpleTokeniser(), new JaccardScorer(), threshold);
+        return new Normaliser(DEFAULT_TITLES, TOKENISER, SCORER, threshold);
     }
 
-    static Stream<Arguments> scoredExamples() {
-        return Stream.of(
-                Arguments.of("Java engineer", "Software engineer", 1.0 / 3),
-                Arguments.of("C# engineer", "Software engineer", 1.0 / 3),
-                Arguments.of("Accountant", "Accountant", 1.0),
-                Arguments.of("Chief Accountant", "Accountant", 0.5)
-        );
-    }
-
-    static Stream<Arguments> invalidTitleLists() {
-        return Stream.of(
-                Arguments.of("null list", null),
-                Arguments.of("empty list", List.of()),
-                Arguments.of("null entry", Arrays.asList("Architect", null)),
-                Arguments.of("blank entry", List.of("Architect", " ")),
-                Arguments.of("duplicate entry", List.of("Architect", "Architect"))
-        );
-    }
-
-    static Stream<Arguments> tieCases() {
-        return Stream.of(
-                Arguments.of(List.of("Engineer", "Developer"), "Engineer"),
-                Arguments.of(List.of("Developer", "Engineer"), "Developer")
-        );
-    }
+    // Examples from the brief
 
     @ParameterizedTest(name = "\"{0}\" -> \"{1}\"")
     @CsvSource({
@@ -63,14 +51,25 @@ class NormaliserTest {
         assertThat(normaliser.normalise(input)).isEqualTo(expected);
     }
 
+    static Stream<Arguments> scoredExamples() {
+        return Stream.of(
+                Arguments.of("Java engineer", "Software engineer", 1.0 / 3),
+                Arguments.of("C# engineer", "Software engineer", 1.0 / 3),
+                Arguments.of("Accountant", "Accountant", 1.0),
+                Arguments.of("Chief Accountant", "Accountant", 0.5)
+        );
+    }
+
     @ParameterizedTest(name = "\"{0}\" -> \"{1}\" at {2}")
     @MethodSource("scoredExamples")
     void findBestMatchExposesScore(String input, String expectedTitle, double expectedScore) {
         assertThat(normaliser.findBestMatch(input)).hasValueSatisfying(result -> {
             assertThat(result.normalisedTitle()).isEqualTo(expectedTitle);
-            assertThat(result.score()).isEqualTo(expectedScore);
+            assertThat(result.score()).isCloseTo(expectedScore, within(TOLERANCE));
         });
     }
+
+    // Input validation
 
     @ParameterizedTest(name = "[{0}]")
     @NullAndEmptySource
@@ -78,6 +77,22 @@ class NormaliserTest {
     void rejectsNullOrBlankInput(String input) {
         assertThatThrownBy(() -> normaliser.normalise(input))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // Construction validation
+
+    static Stream<Arguments> invalidTitleLists() {
+        return Stream.of(
+                Arguments.of("null list", null),
+                Arguments.of("empty list", List.of()),
+                Arguments.of("null entry", Arrays.asList("Architect", null)),
+                Arguments.of("blank entry", List.of("Architect", " ")),
+                Arguments.of("entry with no tokens", List.of("Architect", "###")),
+                Arguments.of("exact duplicate", List.of("Architect", "Architect")),
+                Arguments.of("duplicate differing only by case", List.of("Architect", "ARCHITECT")),
+                Arguments.of("duplicate differing only by punctuation",
+                        List.of("Software engineer", "software-engineer"))
+        );
     }
 
     @ParameterizedTest(name = "{0}")
@@ -96,16 +111,23 @@ class NormaliserTest {
 
     @Test
     void rejectsNullTokeniser() {
-        assertThatThrownBy(() -> new Normaliser(Normaliser.DEFAULT_TITLES, null, new JaccardScorer(), 0.0))
+        assertThatThrownBy(() -> new Normaliser(DEFAULT_TITLES, null, SCORER, DEFAULT_THRESHOLD))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void rejectsNullScorer() {
+        assertThatThrownBy(() -> new Normaliser(DEFAULT_TITLES, TOKENISER, null, DEFAULT_THRESHOLD))
                 .isInstanceOf(NullPointerException.class);
     }
 
     // Tie breaking
 
-    @Test
-    void rejectsNullScorer() {
-        assertThatThrownBy(() -> new Normaliser(Normaliser.DEFAULT_TITLES, new SimpleTokeniser(), null, 0.0))
-                .isInstanceOf(NullPointerException.class);
+    static Stream<Arguments> tieCases() {
+        return Stream.of(
+                Arguments.of(List.of("Engineer", "Developer"), "Engineer"),
+                Arguments.of(List.of("Developer", "Engineer"), "Developer")
+        );
     }
 
     @ParameterizedTest(name = "titles {0} -> \"{1}\"")
@@ -115,13 +137,27 @@ class NormaliserTest {
         assertThat(new Normaliser(titles).normalise("Engineer developer")).isEqualTo(expected);
     }
 
-    // Threshold
+    // No match
+
+    @ParameterizedTest(name = "\"{0}\"")
+    @ValueSource(strings = {"Plumber", "#!?", "C#"})
+    void inputSharingNoTokensIsNotAMatch(String input) {
+        assertThat(normaliser.findBestMatch(input)).isEmpty();
+        assertThatThrownBy(() -> normaliser.normalise(input))
+                .isInstanceOf(NoMatchException.class)
+                .hasMessageContaining(input);
+    }
 
     @Test
-    void defaultThresholdAlwaysReturnsSomething() {
-        assertThat(normaliser.findBestMatch("Plumber"))
-                .hasValueSatisfying(result -> assertThat(result.score()).isEqualTo(0.0));
+    void noMatchExceptionCarriesInputAndThreshold() {
+        assertThatThrownBy(() -> withThreshold(0.5).normalise("Java engineer"))
+                .isInstanceOfSatisfying(NoMatchException.class, e -> {
+                    assertThat(e.getInput()).isEqualTo("Java engineer");
+                    assertThat(e.getThreshold()).isEqualTo(0.5);
+                });
     }
+
+    // Threshold
 
     @ParameterizedTest(name = "\"{0}\" at threshold {1}")
     @CsvSource({
@@ -153,34 +189,29 @@ class NormaliserTest {
         assertThat(withThreshold(threshold).normalise(input)).isEqualTo(expected);
     }
 
+    // Collaborators
+
     @Test
     void usesInjectedScorer() {
-        Normaliser custom = new Normaliser(Normaliser.DEFAULT_TITLES, new SimpleTokeniser(), new FixedScorer("accountant"), 0.0);
+        Normaliser custom = new Normaliser(DEFAULT_TITLES, TOKENISER, new FixedScorer("accountant"), DEFAULT_THRESHOLD);
 
         assertThat(custom.normalise("Java engineer")).isEqualTo("Accountant");
     }
 
-    @ParameterizedTest(name = "\"{0}\" -> score {1}")
-    @CsvSource({
-            "Accountant,    1.0",
-            "Java engineer, 0.0"
-    })
-    void usesInjectedTokeniser(String input, double expectedScore) {
-        Normaliser custom = new Normaliser(Normaliser.DEFAULT_TITLES, Set::of, new JaccardScorer(), 0.0);
+    @Test
+    void usesInjectedTokeniser() {
+        // Tokenise on whitespace only, so "C#" survives as a token and "c#" can be a title.
+        Tokeniser whitespaceOnly = text -> Set.of(text.toLowerCase().split("\\s+"));
+        Normaliser custom = new Normaliser(List.of("c#", "java"), whitespaceOnly, SCORER, DEFAULT_THRESHOLD);
 
-        assertThat(custom.findBestMatch(input))
-                .hasValueSatisfying(result -> assertThat(result.score()).isEqualTo(expectedScore));
+        assertThat(custom.normalise("C# developer")).isEqualTo("c#");
     }
 
     private record FixedScorer(String favouredToken) implements SimilarityScorer {
 
         @Override
-            public double score(Set<String> input, Set<String> candidate) {
-                if (candidate.contains(favouredToken)) {
-                    return 1.0;
-                }
-
-                return 0.0;
-            }
+        public double score(Set<String> input, Set<String> candidate) {
+            return candidate.contains(favouredToken) ? 1.0 : 0.0;
         }
+    }
 }

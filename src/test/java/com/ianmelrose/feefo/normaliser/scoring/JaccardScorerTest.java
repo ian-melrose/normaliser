@@ -34,12 +34,12 @@ class JaccardScorerTest {
     }
 
     @ParameterizedTest(name = "{0} vs {1}")
-    @MethodSource("asymmetricPairs")
+    @MethodSource("symmetryCases")
     void isSymmetric(Set<String> a, Set<String> b) {
         assertThat(scorer.score(a, b)).isEqualTo(scorer.score(b, a));
     }
 
-    static Stream<Arguments> asymmetricPairs() {
+    static Stream<Arguments> symmetryCases() {
         return Stream.of(
                 Arguments.of(Set.of("chief", "accountant"), Set.of("accountant")),
                 Arguments.of(Set.of("java", "engineer"), Set.of("software", "engineer")),

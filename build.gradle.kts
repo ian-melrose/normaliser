@@ -29,6 +29,10 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+tasks.javadoc {
+    (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:all,-missing", "-quiet")
+}
+
 tasks.test {
     useJUnitPlatform()
     testLogging {
