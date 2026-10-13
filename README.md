@@ -18,9 +18,12 @@ download a JDK if it can't find one. The Gradle wrapper is included.
 ## Running
 
 ```bash
-./gradlew test                                          # unit tests, one line per case
-./gradlew run                                           # the four examples from the brief
-./gradlew run --args="'Senior software engineer' Plumber"   # your own inputs
+# unit tests, one line per case
+./gradlew test                                          
+# the four examples from the brief
+./gradlew run         
+# your own inputs                                  
+./gradlew run --args="'Senior software engineer' Plumber"   
 ```
 
 The HTML test report ends up in `build/reports/tests/test/index.html`. The GitHub Actions
