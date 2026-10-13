@@ -1,9 +1,22 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
 plugins {
-    id("java")
+    java
+    application
 }
 
 group = "com.ianmelrose.feefo.normaliser"
 version = "1.0-SNAPSHOT"
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    mainClass = "com.ianmelrose.feefo.normaliser.Main"
+}
 
 repositories {
     mavenCentral()
@@ -18,4 +31,9 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+        showExceptions = true
+        exceptionFormat = TestExceptionFormat.FULL
+    }
 }
