@@ -22,11 +22,9 @@ import static com.ianmelrose.feefo.normaliser.Normaliser.DEFAULT_THRESHOLD;
 import static com.ianmelrose.feefo.normaliser.Normaliser.DEFAULT_TITLES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.within;
 
 class NormaliserTest {
 
-    private static final double TOLERANCE = 1e-9;
     private static final Tokeniser TOKENISER = new SimpleTokeniser();
     private static final SimilarityScorer SCORER = new JaccardScorer();
 
@@ -65,7 +63,7 @@ class NormaliserTest {
     void findBestMatchExposesScore(String input, String expectedTitle, double expectedScore) {
         assertThat(normaliser.findBestMatch(input)).hasValueSatisfying(result -> {
             assertThat(result.normalisedTitle()).isEqualTo(expectedTitle);
-            assertThat(result.score()).isCloseTo(expectedScore, within(TOLERANCE));
+            assertThat(result.score()).isEqualTo(expectedScore);
         });
     }
 

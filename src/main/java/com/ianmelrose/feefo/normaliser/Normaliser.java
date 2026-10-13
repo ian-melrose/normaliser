@@ -22,9 +22,9 @@ import java.util.stream.IntStream;
  * same way and scored against every candidate with a {@link SimilarityScorer}. The candidate with
  * the highest score wins; on an exact tie the title supplied earliest in the list wins.
  *
- * <p>A score of {@code 0.0} is never treated as a match, regardless of the configured threshold:
- * an input that shares nothing with a candidate has no "best" match. The threshold then raises
- * the bar further and is inclusive, so a score equal to the threshold is accepted.
+ * <p>A score of {@code 0.0} is never a match, whatever the threshold: an input that shares nothing
+ * with a candidate has nothing to match on. The threshold is an additional minimum and is
+ * inclusive, so a score equal to it is accepted.
  *
  * <p>Instances are immutable and safe to share between threads.
  */
@@ -35,6 +35,7 @@ public final class Normaliser {
 
     public static final double DEFAULT_THRESHOLD = 0.0;
 
+    // Used with max(): highest score wins, and the reversed index makes the earliest title win a tie.
     private static final Comparator<ScoredCandidate> BEST_SCORE_THEN_EARLIEST =
             Comparator.comparingDouble((ScoredCandidate scored) -> scored.result().score())
                     .thenComparing(ScoredCandidate::index, Comparator.reverseOrder());
@@ -57,6 +58,7 @@ public final class Normaliser {
      * @param tokeniser splits titles and inputs into comparable tokens
      * @param scorer    scores an input's tokens against a candidate's tokens in the range 0.0 to 1.0
      * @param threshold the minimum (inclusive) score for a candidate to count as a match
+     * @throws NullPointerException     if {@code tokeniser} or {@code scorer} is null
      * @throws IllegalArgumentException if {@code threshold} is NaN or outside 0.0 to 1.0, or if
      *                                  {@code titles} is null, empty, contains null or blank entries,
      *                                  contains an entry with no tokens, or contains two entries
@@ -100,7 +102,7 @@ public final class Normaliser {
     }
 
     private boolean isMatch(NormalisationResult result) {
-        return result.score() > 0.0 && result.score() >= threshold;
+        return result.score() > SimilarityScorer.MIN_SCORE && result.score() >= threshold;
     }
 
     private List<Candidate> validateAndTokenise(List<String> titles) {

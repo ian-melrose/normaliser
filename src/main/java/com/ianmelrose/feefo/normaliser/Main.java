@@ -2,6 +2,7 @@ package com.ianmelrose.feefo.normaliser;
 
 import java.io.PrintStream;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Command-line demonstration. With no arguments it runs the examples from the assessment brief;
@@ -24,9 +25,9 @@ public final class Main {
 
         for (String input : inputs) {
             normaliser.findBestMatch(input).ifPresentOrElse(
-                    result -> out.printf("%-20s -> %-20s (score %.2f)%n",
+                    result -> out.printf(Locale.ROOT, "%-20s -> %-20s (score %.2f)%n",
                             quote(input), quote(result.normalisedTitle()), result.score()),
-                    () -> out.printf("%-20s -> no match%n", quote(input)));
+                    () -> out.printf(Locale.ROOT, "%-20s -> no match%n", quote(input)));
         }
     }
 

@@ -17,7 +17,7 @@ public class JaccardScorer implements SimilarityScorer {
         Objects.requireNonNull(candidateTokens, "candidateTokens cannot be null");
 
         if (inputTokens.isEmpty() && candidateTokens.isEmpty()) {
-            return 0.0;
+            return MIN_SCORE;
         }
 
         long intersection = inputTokens.stream()
